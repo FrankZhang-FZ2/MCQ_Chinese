@@ -1,0 +1,73 @@
+"0","library(haven)"
+"0","library(tidyverse)"
+"0","library(foreign)"
+"0","library(lme4)"
+"2","Loading required package: Matrix
+"
+"2","
+Attaching package: ‘Matrix’
+
+"
+"2","The following objects are masked from ‘package:tidyr’:
+
+    expand, pack, unpack
+
+"
+"2","
+Attaching package: ‘lme4’
+
+"
+"2","The following object is masked from ‘package:mirt’:
+
+    fixef
+
+"
+"2","The following object is masked from ‘package:rio’:
+
+    factorize
+
+"
+"2","The following object is masked from ‘package:ufs’:
+
+    getData
+
+"
+"0","library(lmerTest)"
+"2","
+Attaching package: ‘lmerTest’
+
+"
+"2","The following object is masked from ‘package:lme4’:
+
+    lmer
+
+"
+"2","The following object is masked from ‘package:stats’:
+
+    step
+
+"
+"0","library(mvnormtest)"
+"0","library(mvnormalTest)"
+"2","
+Attaching package: ‘mvnormalTest’
+
+"
+"2","The following object is masked from ‘package:psych’:
+
+    mardia
+
+"
+"0","library(psych)"
+"0","library(ggpubr)"
+"0","library(rstatix)"
+"2","
+Attaching package: ‘rstatix’
+
+"
+"2","The following object is masked from ‘package:stats’:
+
+    filter
+
+"
+"0","library(heplots)"

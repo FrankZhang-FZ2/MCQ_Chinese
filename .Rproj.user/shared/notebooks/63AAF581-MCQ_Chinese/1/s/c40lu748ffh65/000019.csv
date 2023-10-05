@@ -1,0 +1,8 @@
+"0","MCQ_CN_overall_fit <- cfa(
+  model = MCQ_CN_overall_model,
+  data = MCQ_CN,
+  std.lv = TRUE)
+"
+"2","Warning: lavaan WARNING: covariance matrix of latent variables
+                is not positive definite;
+                use lavInspect(fit, ""cov.lv"") to investigate."

@@ -1,0 +1,6 @@
+"0","#MLM"
+"0","MLM <- read_sav(""MLM.sav"")"
+"0","#MANOVA"
+"0","Homeless <- read_sav(""Homelessness - revised.sav"")"
+"0","#one way ANOVA in regression"
+"0",""

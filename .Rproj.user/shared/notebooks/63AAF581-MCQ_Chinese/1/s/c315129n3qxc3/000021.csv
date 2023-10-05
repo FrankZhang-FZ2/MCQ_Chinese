@@ -1,0 +1,14 @@
+"0","EFA_fit_MCQ_CN <- fa(MCQ_CN[7:30],"
+"0","             nfactors = 2,"
+"0","             rotate = ""oblimin"","
+"0","             fm=""ml"")"
+"0","EFA_fit_MCQ_CN"
+"1","Factor Analysis using method = "
+"1"," "
+"1","ml"
+"1","
+Call: "
+"1","fa(r = MCQ_CN[7:30], nfactors = 2, rotate = ""oblimin"", fm = ""ml"")
+"
+"1","Standardized loadings (pattern matrix) based upon correlation matrix
+"
