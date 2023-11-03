@@ -36,6 +36,8 @@ library(mvnormalTest)
 library(ggpubr)
 library(rstatix)
 library(heplots)
+library(knitr)
+library(MOTE)
 ```
 
 ### cleaning
@@ -60,6 +62,8 @@ data[,names] <-
   lapply(data[,names], as.numeric)
 
 rm(names)
+
+writexl::write_xlsx(MCQ_CN,"MCQ_CN.xlsx")
 ```
 
 ```{r missing}
@@ -154,6 +158,7 @@ F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18
 L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22
 P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26
 R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30
+RC =~ MCQ_2 + MCQ_7 + MCQ_14 + MCQ_17 + MCQ_20 + MCQ_25 + MCQ_28
 ')
 
 MCQ_CN_overall_fit <- cfa(
@@ -187,7 +192,7 @@ model_parameters(MCQ_CN_overall_fit, standardize = TRUE)
 ```{r CFA_GM}
 
 (MCQ_CN_GM_model <- '
-GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6 + MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10 + MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14 + MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18 + MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22 + MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26 + MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6
 ')
 
 MCQ_CN_GM_fit <- cfa(
@@ -392,6 +397,41 @@ model_parameters(MCQ_CN_P_fit, standardize = TRUE)
 
 ```
 
+##Purity
+
+```{r CFA_Purity}
+
+(MCQ_CN_R_model <- '
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26
+')
+
+MCQ_CN_R_fit <- cfa(
+  model = MCQ_CN_R_model,
+  data = MCQ_CN,
+  std.lv = TRUE)
+
+summary(MCQ_CN_R_fit,
+        standardized = TRUE,
+        rsquare = TRUE,
+        fit.measures=TRUE)
+
+parameterestimates(MCQ_CN_R_fit,
+                   standardized = TRUE)
+
+fitmeasures(MCQ_CN_R_fit)
+
+modificationindices(MCQ_CN_R_fit,sort = T)
+
+semPaths(MCQ_CN_R_fit,
+         whatLabels = "std",
+         what = "std",
+         layout = "tree2",
+         edge.label.cex = 1)
+
+model_parameters(MCQ_CN_R_fit, standardize = TRUE)
+
+```
+
 ##Respect
 
 ```{r CFA_R}
@@ -427,38 +467,6 @@ model_parameters(MCQ_CN_R_fit, standardize = TRUE)
 
 ```
 
-## EFA
-
-```{r EFA}
-
-#Kaiser Criterion
-ev<- eigen(cor(MCQ_CN))
-ev$values
-sum(ev$values > 1)
-sum(ev$values > .7)
-
-#scree plot and parallel analysis
-scree(MCQ_CN, pc=FALSE)
-fa.parallel(MCQ_CN,
-            fm="ml",
-            fa="fa")
-
-EFA_fit_MCQ_CN <- fa(MCQ_CN[7:30],
-             nfactors = 2,
-             rotate = "oblimin",
-             fm="ml")
-EFA_fit_MCQ_CN
-print(EFA_fit_MCQ_CN$loadings, cutoff = 0.3)
-print(EFA_fit_MCQ_CN$loadings)
-
-##fit indices
-EFA_fit_MCQ_CN$rms  # Root mean square of the residuals (lower the better)
-EFA_fit_MCQ_CN$RMSEA # root mean squared error of approximation (lower the better)
-EFA_fit_MCQ_CN$TLI  # tucker lewis index
-1- ((EFA_fit_MCQ_CN$STATISTIC-EFA_fit_MCQ_CN$dof)/
-      (EFA_fit_MCQ_CN$null.chisq-EFA_fit_MCQ_CN$null.dof))  #CFI
-```
-
 ### IRT
 
 ```{R IRT}
@@ -481,3 +489,1732 @@ plot(MCQ_IRT) #expected score curve
 
 
 ```
+
+
+####Multi group models
+
+```{r include=FALSE}
+#import
+library(haven)
+
+MCQ_US <- read_sav("//10.4.6.5/psychology/labs/beaconproject/Empirical Research Activities/Study 1-Do Self-Identified ME Differ/The 10000/Data/Data for Analysis (CLEAN)/The 10000_Data Downloaded FOR ANALYSIS.sav")
+
+
+#retain only items relating to MCQ
+MCQ_US <- MCQ_US %>%
+  select(c(starts_with("MTS")))
+
+MCQ_US <- MCQ_US[,-c(35:45)] %>% 
+  select(!contains("Hum"))
+
+```
+
+```{r clean}
+
+missing_R <- apply(MCQ_US,1,percent_missing)
+table(missing_R)
+
+MCQ_US <- subset(MCQ_US, missing_R<=0)
+
+names(MCQ_US)
+
+names(MCQ_US) <- c("MCQ_1","MCQ_2","MCQ_3","MCQ_4","MCQ_5","MCQ_6",
+                   "MCQ_19","MCQ_20","MCQ_21","MCQ_22",
+                   "MCQ_7","MCQ_8","MCQ_9","MCQ_10",
+                   "MCQ_15","MCQ_16","MCQ_17","MCQ_18",
+                   "MCQ_11","MCQ_12","MCQ_13","MCQ_14",
+                   "MCQ_23","MCQ_24","MCQ_25","MCQ_26",
+                   "MCQ_27","MCQ_28","MCQ_29","MCQ_30")
+```
+
+
+```{r}
+#data binding and summary stat
+MCQ_CN$country <- rep(1, nrow(MCQ_CN))
+
+MCQ_US$country <- rep(2, nrow(MCQ_US))
+
+MCQ <- rbind.data.frame(MCQ_CN,MCQ_US)
+
+table(MCQ$country) #343 Chinese participants and 9365 American
+
+MCQ$country <- factor(MCQ$country,
+                      levels = c(1,2),
+                      labels = c("Chinese","American"))
+```
+
+#General morality
+
+```{r}
+
+overall.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6
+'
+overall.fit <- cfa(model = overall.model,
+                   data = MCQ,
+                   meanstructure = TRUE)
+
+summary(overall.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit <- matrix(NA,nrow = 7, ncol = 6)
+colnames(table_fit)<- c("model","X2","df","CFI","RMSEA","SRMR")
+table_fit[1,] <- c("Overall Model", round(fitmeasures(overall.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(overall.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#American sample alone
+American.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6
+'
+American.fit <- cfa(model = overall.model,
+                   data = MCQ[MCQ$country == "American",],
+                   meanstructure = TRUE)
+
+summary(American.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+table_fit[2,] <- c("American Model", round(fitmeasures(American.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(American.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#Chinese sample alone
+Chinese.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6
+'
+Chinese.fit <- cfa(model = Chinese.model,
+                   data = MCQ[MCQ$country == "Chinese",],
+                   meanstructure = TRUE)
+
+summary(Chinese.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+table_fit[3,] <- c("Chinese Model", round(fitmeasures(Chinese.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(Chinese.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#Configural invariance
+configural.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6
+'
+configural.fit <- cfa(model = configural.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country")
+
+summary(configural.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+table_fit[4,] <- c("configural Model", round(fitmeasures(configural.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(configural.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#metric invariance (restrict loadings)
+metric.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6
+'
+metric.fit <- cfa(model = metric.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings"))
+
+summary(metric.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+table_fit[5,] <- c("metric Model", round(fitmeasures(metric.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(metric.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#scalar invariance (restrict loadings and intercepts)
+scalar.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6
+'
+scalar.fit <- cfa(model = scalar.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts"))
+
+summary(scalar.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[6,] <- c("scalar Model", round(fitmeasures(scalar.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(scalar.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#strict invariance(restrict loadings, intercepts, and residuals)
+strict.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6
+'
+strict.fit <- cfa(model = strict.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts","residuals"))
+
+summary(strict.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[7,] <- c("strict Model", round(fitmeasures(strict.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(strict.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#latent scores
+predicted_scores <- lavPredict(strict.fit, type = "ov")
+
+
+predicted_scores <- as.data.frame(do.call(rbind,predicted_scores))
+predicted_scores$country <- c(rep("Chinese", nrow(MCQ_CN)), rep("American",nrow(MCQ_US)))
+
+predicted_scores$sum <- apply(predicted_scores[,1:6],1,sum)
+
+tapply(predicted_scores$sum,predicted_scores$country,mean)
+
+```
+
+
+```{r}
+
+#effect size
+
+Mean <- tapply(predicted_scores$sum,predicted_scores$country,mean)
+SD <- tapply(predicted_scores$sum,predicted_scores$country,sd)
+N <- tapply(predicted_scores$sum,predicted_scores$country,length)
+
+effect_size <- d.ind.t(Mean[1],Mean[2],SD[1],SD[2],N[1],N[2], a = .05)
+effect_size$estimate # give cohen's d
+effect_size$statistic # t-test result comparing effect size
+```
+
+
+
+#Honesty
+
+```{r}
+
+overall.model <- '
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10
+'
+overall.fit <- cfa(model = overall.model,
+                   data = MCQ,
+                   meanstructure = TRUE)
+
+summary(overall.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+table_fit <- matrix(NA,nrow = 7, ncol = 6)
+colnames(table_fit)<- c("model","X2","df","CFI","RMSEA","SRMR")
+table_fit[1,] <- c("Overall Model", round(fitmeasures(overall.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(overall.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#American sample alone
+American.model <- '
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10
+'
+American.fit <- cfa(model = overall.model,
+                   data = MCQ[MCQ$country == "American",],
+                   meanstructure = TRUE)
+
+summary(American.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+table_fit[2,] <- c("American Model", round(fitmeasures(American.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(American.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#Chinese sample alone
+Chinese.model <- '
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10
+'
+Chinese.fit <- cfa(model = Chinese.model,
+                   data = MCQ[MCQ$country == "Chinese",],
+                   meanstructure = TRUE)
+
+summary(Chinese.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[3,] <- c("Chinese Model", round(fitmeasures(Chinese.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(Chinese.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#Configural invariance
+configural.model <- '
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10
+'
+configural.fit <- cfa(model = configural.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country")
+
+summary(configural.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[4,] <- c("configural Model", round(fitmeasures(configural.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(configural.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#metric invariance
+metric.model <- '
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10
+'
+metric.fit <- cfa(model = metric.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings"))
+
+summary(metric.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[5,] <- c("metric Model", round(fitmeasures(metric.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(metric.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+
+#scalar invariance
+scalar.model <- '
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10
+'
+scalar.fit <- cfa(model = scalar.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts"))
+
+summary(scalar.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[6,] <- c("scalar Model", round(fitmeasures(scalar.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(scalar.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#strict invariance
+strict.model <- '
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10
+'
+strict.fit <- cfa(model = strict.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts","residuals"))
+
+summary(strict.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[7,] <- c("strict Model", round(fitmeasures(strict.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(strict.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#predicted scores
+predicted_scores <- lavPredict(strict.fit, type = "ov")
+
+
+predicted_scores <- as.data.frame(do.call(rbind,predicted_scores))
+predicted_scores$country <- c(rep("Chinese", nrow(MCQ_CN)), rep("American",nrow(MCQ_US)))
+
+predicted_scores$sum <- apply(predicted_scores[,1:4],1,sum)
+
+tapply(predicted_scores$sum,predicted_scores$country,mean)
+
+```
+
+
+
+```{r}
+#effect size
+
+Mean <- tapply(predicted_scores$sum,predicted_scores$country,mean)
+SD <- tapply(predicted_scores$sum,predicted_scores$country,sd)
+N <- tapply(predicted_scores$sum,predicted_scores$country,length)
+
+effect_size <- d.ind.t(Mean[1],Mean[2],SD[1],SD[2],N[1],N[2], a = .05)
+effect_size$estimate # give cohen's d
+effect_size$statistic # t-test result comparing effect size
+```
+
+
+#Compassion
+
+```{r}
+
+overall.model <- '
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14
+'
+overall.fit <- cfa(model = overall.model,
+                   data = MCQ,
+                   meanstructure = TRUE)
+
+summary(overall.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit <- matrix(NA,nrow = 7, ncol = 6)
+colnames(table_fit)<- c("model","X2","df","CFI","RMSEA","SRMR")
+table_fit[1,] <- c("Overall Model", round(fitmeasures(overall.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(overall.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#American sample alone
+American.model <- '
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14
+'
+American.fit <- cfa(model = overall.model,
+                   data = MCQ[MCQ$country == "American",],
+                   meanstructure = TRUE)
+
+summary(American.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[2,] <- c("American Model", round(fitmeasures(American.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(American.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Chinese sample alone
+Chinese.model <- '
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14
+'
+Chinese.fit <- cfa(model = Chinese.model,
+                   data = MCQ[MCQ$country == "Chinese",],
+                   meanstructure = TRUE)
+
+summary(Chinese.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[3,] <- c("Chinese Model", round(fitmeasures(Chinese.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(Chinese.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Configural invariance
+configural.model <- '
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14
+'
+configural.fit <- cfa(model = configural.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country")
+
+summary(configural.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[4,] <- c("configural Model", round(fitmeasures(configural.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(configural.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#metric invariance
+metric.model <- '
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14
+'
+metric.fit <- cfa(model = metric.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings"))
+
+summary(metric.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[5,] <- c("metric Model", round(fitmeasures(metric.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(metric.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#scalar invariance
+scalar.model <- '
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14
+'
+scalar.fit <- cfa(model = scalar.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts"))
+
+summary(scalar.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[6,] <- c("scalar Model", round(fitmeasures(scalar.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(scalar.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#strict invariance
+strict.model <- '
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14
+'
+strict.fit <- cfa(model = strict.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts","residuals"))
+
+summary(strict.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[7,] <- c("strict Model", round(fitmeasures(strict.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(strict.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#predicted scores
+predicted_scores <- lavPredict(strict.fit, type = "ov")
+
+
+predicted_scores <- as.data.frame(do.call(rbind,predicted_scores))
+predicted_scores$country <- c(rep("Chinese", nrow(MCQ_CN)), rep("American",nrow(MCQ_US)))
+
+predicted_scores$sum <- apply(predicted_scores[,1:4],1,sum)
+
+tapply(predicted_scores$sum,predicted_scores$country,mean)
+
+```
+
+
+
+```{r}
+#effect size
+Mean <- tapply(predicted_scores$sum,predicted_scores$country,mean)
+SD <- tapply(predicted_scores$sum,predicted_scores$country,sd)
+N <- tapply(predicted_scores$sum,predicted_scores$country,length)
+
+effect_size <- d.ind.t(Mean[1],Mean[2],SD[1],SD[2],N[1],N[2], a = .05)
+effect_size$estimate # give cohen's d
+effect_size$statistic # t-test result comparing effect size
+```
+
+
+#Fairness
+
+```{r}
+
+overall.model <- '
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18
+'
+overall.fit <- cfa(model = overall.model,
+                   data = MCQ,
+                   meanstructure = TRUE)
+
+summary(overall.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit <- matrix(NA,nrow = 7, ncol = 6)
+colnames(table_fit)<- c("model","X2","df","CFI","RMSEA","SRMR")
+table_fit[1,] <- c("Overall Model", round(fitmeasures(overall.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(overall.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#American sample alone
+American.model <- '
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18
+'
+American.fit <- cfa(model = overall.model,
+                   data = MCQ[MCQ$country == "American",],
+                   meanstructure = TRUE)
+
+summary(American.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[2,] <- c("American Model", round(fitmeasures(American.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(American.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Chinese sample alone
+Chinese.model <- '
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18
+'
+Chinese.fit <- cfa(model = Chinese.model,
+                   data = MCQ[MCQ$country == "Chinese",],
+                   meanstructure = TRUE)
+
+summary(Chinese.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[3,] <- c("Chinese Model", round(fitmeasures(Chinese.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(Chinese.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Configural invariance
+configural.model <- '
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18
+'
+configural.fit <- cfa(model = configural.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country")
+
+summary(configural.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[4,] <- c("configural Model", round(fitmeasures(configural.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#metric invariance
+metric.model <- '
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18
+'
+metric.fit <- cfa(model = metric.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings"))
+
+summary(metric.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[5,] <- c("metric Model", round(fitmeasures(metric.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#scalar invariance
+scalar.model <- '
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18
+'
+scalar.fit <- cfa(model = scalar.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts"))
+
+summary(scalar.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[6,] <- c("scalar Model", round(fitmeasures(scalar.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#strict invariance
+strict.model <- '
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18
+'
+strict.fit <- cfa(model = strict.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts","residuals"))
+
+summary(strict.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[7,] <- c("strict Model", round(fitmeasures(strict.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#predicted scores
+predicted_scores <- lavPredict(strict.fit, type = "ov")
+
+
+predicted_scores <- as.data.frame(do.call(rbind,predicted_scores))
+predicted_scores$country <- c(rep("Chinese", nrow(MCQ_CN)), rep("American",nrow(MCQ_US)))
+
+predicted_scores$sum <- apply(predicted_scores[,1:4],1,sum)
+
+tapply(predicted_scores$sum,predicted_scores$country,mean)
+
+```
+
+
+
+```{r}
+#effect size
+Mean <- tapply(predicted_scores$sum,predicted_scores$country,mean)
+SD <- tapply(predicted_scores$sum,predicted_scores$country,sd)
+N <- tapply(predicted_scores$sum,predicted_scores$country,length)
+
+effect_size <- d.ind.t(Mean[1],Mean[2],SD[1],SD[2],N[1],N[2], a = .05)
+effect_size$estimate # give cohen's d
+effect_size$statistic # t-test result comparing effect size
+```
+
+#loyalty
+
+```{r}
+
+overall.model <- '
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22
+'
+overall.fit <- cfa(model = overall.model,
+                   data = MCQ,
+                   meanstructure = TRUE)
+
+summary(overall.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit <- matrix(NA,nrow = 7, ncol = 6)
+colnames(table_fit)<- c("model","X2","df","CFI","RMSEA","SRMR")
+table_fit[1,] <- c("Overall Model", round(fitmeasures(overall.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(overall.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#American sample alone
+American.model <- '
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22
+'
+American.fit <- cfa(model = overall.model,
+                   data = MCQ[MCQ$country == "American",],
+                   meanstructure = TRUE)
+
+summary(American.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[2,] <- c("American Model", round(fitmeasures(American.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(American.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Chinese sample alone
+Chinese.model <- '
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22
+'
+Chinese.fit <- cfa(model = Chinese.model,
+                   data = MCQ[MCQ$country == "Chinese",],
+                   meanstructure = TRUE)
+
+summary(Chinese.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[3,] <- c("Chinese Model", round(fitmeasures(Chinese.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(Chinese.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Configural invariance
+configural.model <- '
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22
+'
+configural.fit <- cfa(model = configural.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country")
+
+summary(configural.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[4,] <- c("configural Model", round(fitmeasures(configural.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#metric invariance
+metric.model <- '
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22
+'
+metric.fit <- cfa(model = metric.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings"))
+
+summary(metric.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[5,] <- c("metric Model", round(fitmeasures(metric.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#scalar invariance
+scalar.model <- '
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22
+'
+scalar.fit <- cfa(model = scalar.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts"))
+
+summary(scalar.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[6,] <- c("scalar Model", round(fitmeasures(scalar.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#strict invariance
+strict.model <- '
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22
+'
+strict.fit <- cfa(model = strict.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts","residuals"))
+
+summary(strict.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[7,] <- c("strict Model", round(fitmeasures(strict.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#predicted scores
+predicted_scores <- lavPredict(strict.fit, type = "ov")
+
+
+predicted_scores <- as.data.frame(do.call(rbind,predicted_scores))
+predicted_scores$country <- c(rep("Chinese", nrow(MCQ_CN)), rep("American",nrow(MCQ_US)))
+
+predicted_scores$sum <- apply(predicted_scores[,1:4],1,sum)
+
+tapply(predicted_scores$sum,predicted_scores$country,mean)
+
+```
+
+
+
+```{r}
+#effect size
+Mean <- tapply(predicted_scores$sum,predicted_scores$country,mean)
+SD <- tapply(predicted_scores$sum,predicted_scores$country,sd)
+N <- tapply(predicted_scores$sum,predicted_scores$country,length)
+
+effect_size <- d.ind.t(Mean[1],Mean[2],SD[1],SD[2],N[1],N[2], a = .05)
+effect_size$estimate # give cohen's d
+effect_size$statistic # t-test result comparing effect size
+```
+
+
+#Purity
+
+```{r}
+
+overall.model <- '
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26
+'
+overall.fit <- cfa(model = overall.model,
+                   data = MCQ,
+                   meanstructure = TRUE)
+
+summary(overall.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit <- matrix(NA,nrow = 7, ncol = 6)
+colnames(table_fit)<- c("model","X2","df","CFI","RMSEA","SRMR")
+table_fit[1,] <- c("Overall Model", round(fitmeasures(overall.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(overall.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#American sample alone
+American.model <- '
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26
+'
+American.fit <- cfa(model = overall.model,
+                   data = MCQ[MCQ$country == "American",],
+                   meanstructure = TRUE)
+
+summary(American.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[2,] <- c("American Model", round(fitmeasures(American.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(American.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Chinese sample alone
+Chinese.model <- '
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26
+'
+Chinese.fit <- cfa(model = Chinese.model,
+                   data = MCQ[MCQ$country == "Chinese",],
+                   meanstructure = TRUE)
+
+summary(Chinese.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[3,] <- c("Chinese Model", round(fitmeasures(Chinese.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(Chinese.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Configural invariance
+configural.model <- '
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26
+'
+configural.fit <- cfa(model = configural.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country")
+
+summary(configural.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[4,] <- c("configural Model", round(fitmeasures(configural.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+
+```{r}
+
+#metric invariance
+metric.model <- '
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26
+'
+metric.fit <- cfa(model = metric.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings"))
+
+summary(metric.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[5,] <- c("metric Model", round(fitmeasures(metric.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+
+#scalar invariance
+scalar.model <- '
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26
+'
+scalar.fit <- cfa(model = scalar.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts"))
+
+summary(scalar.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[6,] <- c("scalar Model", round(fitmeasures(scalar.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+
+```{r}
+
+#strict invariance
+strict.model <- '
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26
+'
+strict.fit <- cfa(model = strict.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts","residuals"))
+
+summary(strict.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[7,] <- c("strict Model", round(fitmeasures(strict.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#predicted scores
+predicted_scores <- lavPredict(strict.fit, type = "ov")
+
+
+predicted_scores <- as.data.frame(do.call(rbind,predicted_scores))
+predicted_scores$country <- c(rep("Chinese", nrow(MCQ_CN)), rep("American",nrow(MCQ_US)))
+
+predicted_scores$sum <- apply(predicted_scores[,1:4],1,sum)
+
+tapply(predicted_scores$sum,predicted_scores$country,mean)
+
+```
+
+
+
+```{r}
+#effect size
+Mean <- tapply(predicted_scores$sum,predicted_scores$country,mean)
+SD <- tapply(predicted_scores$sum,predicted_scores$country,sd)
+N <- tapply(predicted_scores$sum,predicted_scores$country,length)
+
+effect_size <- d.ind.t(Mean[1],Mean[2],SD[1],SD[2],N[1],N[2], a = .05)
+effect_size$estimate # give cohen's d
+effect_size$statistic # t-test result comparing effect size
+```
+
+#Respect
+
+```{r}
+
+overall.model <- '
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30
+'
+overall.fit <- cfa(model = overall.model,
+                   data = MCQ,
+                   meanstructure = TRUE)
+
+summary(overall.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit <- matrix(NA,nrow = 7, ncol = 6)
+colnames(table_fit)<- c("model","X2","df","CFI","RMSEA","SRMR")
+table_fit[1,] <- c("Overall Model", round(fitmeasures(overall.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(overall.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#American sample alone
+American.model <- '
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30
+'
+American.fit <- cfa(model = overall.model,
+                   data = MCQ[MCQ$country == "American",],
+                   meanstructure = TRUE)
+
+summary(American.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[2,] <- c("American Model", round(fitmeasures(American.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(American.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Chinese sample alone
+Chinese.model <- '
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30
+'
+Chinese.fit <- cfa(model = Chinese.model,
+                   data = MCQ[MCQ$country == "Chinese",],
+                   meanstructure = TRUE)
+
+summary(Chinese.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[3,] <- c("Chinese Model", round(fitmeasures(Chinese.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(Chinese.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Configural invariance
+configural.model <- '
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30
+'
+configural.fit <- cfa(model = configural.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country")
+
+summary(configural.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[4,] <- c("configural Model", round(fitmeasures(configural.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+
+```{r}
+
+#metric invariance
+metric.model <- '
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30
+'
+metric.fit <- cfa(model = metric.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings"))
+
+summary(metric.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[5,] <- c("metric Model", round(fitmeasures(metric.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+
+#scalar invariance
+scalar.model <- '
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30
+'
+scalar.fit <- cfa(model = scalar.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts"))
+
+summary(scalar.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[6,] <- c("scalar Model", round(fitmeasures(scalar.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+
+```{r}
+
+#strict invariance
+strict.model <- '
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30
+'
+strict.fit <- cfa(model = strict.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts","residuals"))
+
+summary(strict.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[7,] <- c("strict Model", round(fitmeasures(strict.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#predicted scores
+predicted_scores <- lavPredict(strict.fit, type = "ov")
+
+
+predicted_scores <- as.data.frame(do.call(rbind,predicted_scores))
+predicted_scores$country <- c(rep("Chinese", nrow(MCQ_CN)), rep("American",nrow(MCQ_US)))
+
+predicted_scores$sum <- apply(predicted_scores[,1:4],1,sum)
+
+tapply(predicted_scores$sum,predicted_scores$country,mean)
+
+```
+
+
+
+```{r}
+#effect size
+Mean <- tapply(predicted_scores$sum,predicted_scores$country,mean)
+SD <- tapply(predicted_scores$sum,predicted_scores$country,sd)
+N <- tapply(predicted_scores$sum,predicted_scores$country,length)
+
+effect_size <- d.ind.t(Mean[1],Mean[2],SD[1],SD[2],N[1],N[2], a = .05)
+effect_size$estimate # give cohen's d
+effect_size$statistic # t-test result comparing effect size
+```
+
+#General model
+
+```{r}
+
+overall.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6 + H + C + F + L + P + R 
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10 
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14 
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18 
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22 
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26 
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30 
+RC =~ MCQ_2 + MCQ_7 + MCQ_14 + MCQ_17 + MCQ_20 + MCQ_25 + MCQ_28
+'
+overall.fit <- cfa(model = overall.model,
+                   data = MCQ,
+                   meanstructure = TRUE)
+
+summary(overall.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit <- matrix(NA,nrow = 7, ncol = 6)
+colnames(table_fit)<- c("model","X2","df","CFI","RMSEA","SRMR")
+table_fit[1,] <- c("Overall Model", round(fitmeasures(overall.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(overall.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#American sample alone
+American.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6 + H + C + F + L + P + R 
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10 
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14 
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18 
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22 
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26 
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30 
+RC =~ MCQ_2 + MCQ_7 + MCQ_14 + MCQ_17 + MCQ_20 + MCQ_25 + MCQ_28
+'
+American.fit <- cfa(model = overall.model,
+                   data = MCQ[MCQ$country == "American",],
+                   meanstructure = TRUE)
+
+summary(American.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[2,] <- c("American Model", round(fitmeasures(American.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(American.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Chinese sample alone
+Chinese.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6 + H + C + F + L + P + R 
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10 
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14 
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18 
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22 
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26 
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30 
+RC =~ MCQ_2 + MCQ_7 + MCQ_14 + MCQ_17 + MCQ_20 + MCQ_25 + MCQ_28
+'
+Chinese.fit <- cfa(model = Chinese.model,
+                   data = MCQ[MCQ$country == "Chinese",],
+                   meanstructure = TRUE)
+
+summary(Chinese.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[3,] <- c("Chinese Model", round(fitmeasures(Chinese.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+
+semPaths(Chinese.fit,
+         whatLabels = "std",
+         edge.label.cex = 1,
+         layout = "tree")
+```
+
+
+```{r}
+#Configural invariance
+configural.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6 + H + C + F + L + P + R 
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10 
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14 
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18 
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22 
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26 
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30 
+RC =~ MCQ_2 + MCQ_7 + MCQ_14 + MCQ_17 + MCQ_20 + MCQ_25 + MCQ_28
+'
+configural.fit <- cfa(model = configural.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country")
+
+summary(configural.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[4,] <- c("configural Model", round(fitmeasures(configural.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#metric invariance
+metric.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6 + H + C + F + L + P + R 
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10 
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14 
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18 
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22 
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26 
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30 
+RC =~ MCQ_2 + MCQ_7 + MCQ_14 + MCQ_17 + MCQ_20 + MCQ_25 + MCQ_28
+'
+metric.fit <- cfa(model = metric.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings"))
+
+summary(metric.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+
+table_fit[5,] <- c("metric Model", round(fitmeasures(metric.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#scalar invariance
+scalar.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6 + H + C + F + L + P + R 
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10 
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14 
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18 
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22 
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26 
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30 
+RC =~ MCQ_2 + MCQ_7 + MCQ_14 + MCQ_17 + MCQ_20 + MCQ_25 + MCQ_28
+'
+scalar.fit <- cfa(model = scalar.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts"))
+
+summary(scalar.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+table_fit[6,] <- c("scalar Model", round(fitmeasures(scalar.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#strict invariance
+strict.model <- '
+GM =~ MCQ_1 + MCQ_2 + MCQ_3 + MCQ_4 + MCQ_5 + MCQ_6 + H + C + F + L + P + R 
+H =~ MCQ_7 + MCQ_8 + MCQ_9 + MCQ_10 
+C =~ MCQ_11 + MCQ_12 + MCQ_13 + MCQ_14 
+F =~ MCQ_15 + MCQ_16 + MCQ_17 + MCQ_18 
+L =~ MCQ_19 + MCQ_20 + MCQ_21 + MCQ_22 
+P =~ MCQ_23 + MCQ_24 + MCQ_25 + MCQ_26 
+R =~ MCQ_27 + MCQ_28 + MCQ_29 + MCQ_30 
+RC =~ MCQ_2 + MCQ_7 + MCQ_14 + MCQ_17 + MCQ_20 + MCQ_25 + MCQ_28
+'
+strict.fit <- cfa(model = strict.model,
+                   data = MCQ,
+                   meanstructure = TRUE,
+                   group = "country",
+                   group.equal = c("loadings","intercepts","residuals"))
+
+summary(strict.fit,
+        standardized = T,
+        rsquare = T,
+        fit.measures = T)
+
+table_fit[7,] <- c("strict Model", round(fitmeasures(strict.fit,c("chisq","df","cfi","rmsea","srmr")),3))
+kable(table_fit)
+```
+
+
+```{r}
+#predicted scores
+predicted_scores <- lavPredict(strict.fit, type = "ov")
+
+
+predicted_scores <- as.data.frame(do.call(rbind,predicted_scores))
+predicted_scores$country <- c(rep("Chinese", nrow(MCQ_CN)), rep("American",nrow(MCQ_US)))
+
+predicted_scores$sum <- apply(predicted_scores[,1:4],1,sum)
+
+tapply(predicted_scores$sum,predicted_scores$country,mean)
+
+```
+
+
+```{r}
+
+#effect size
+Mean <- tapply(predicted_scores$sum,predicted_scores$country,mean)
+SD <- tapply(predicted_scores$sum,predicted_scores$country,sd)
+N <- tapply(predicted_scores$sum,predicted_scores$country,length)
+
+effect_size <- d.ind.t(Mean[1],Mean[2],SD[1],SD[2],N[1],N[2], a = .05)
+effect_size$estimate # give cohen's d
+effect_size$statistic # t-test result comparing effect size
+```
+
+
